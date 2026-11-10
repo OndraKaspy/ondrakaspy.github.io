@@ -1,11 +1,525 @@
-<html lang="en">
+<!DOCTYPE html>
+<html lang="cs" class="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webová stránka</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kompaktní graf y = A sin(Bx + C) + D</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom compact range sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: #1e293b;
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: currentColor;
+      border: 2px solid #0f172a;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      transition: transform 0.1s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.2);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: currentColor;
+      border: 2px solid #0f172a;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      transition: transform 0.1s ease;
+    }
+  </style>
 </head>
-<body>
-    <h1>test</h1>
-    <img src="https://images.pexels.com/photos/207580/pexels-photo-207580.jpeg" alt="image.png" style="width:100vw; height:100vh; object-fit:cover;">
+<body class="flex items-start justify-center p-1.5 sm:p-2">
+
+  <!-- Main Compact Container (fits within ~395px height) -->
+  <div class="w-full max-w-2xl bg-slate-900/95 border border-slate-800 rounded-xl p-2 sm:p-2.5 shadow-xl flex flex-col gap-1.5">
+
+    <!-- 1. COMPACT HEADER: Dynamic Formula + Preset Buttons -->
+    <div class="flex flex-wrap items-center justify-between gap-1.5 bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1.5">
+      <div class="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mono tracking-tight">
+        <span class="text-slate-400">y =</span>
+        <span id="eqText" class="text-slate-100">2 sin(x) + 1</span>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <button id="btnNotebook" type="button"
+          class="px-2 py-1 rounded-md text-[11px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 active:scale-95 transition">
+          Ze sešitu: 10 sin(3x+π)+3
+        </button>
+        <button id="btnReset" type="button"
+          class="px-2 py-1 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 active:scale-95 transition">
+          Základ: sin(x)
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. COMPACT GRAPH CANVAS (~185px height) -->
+    <div class="relative w-full h-[185px] sm:h-[195px] bg-slate-950 border border-slate-800/90 rounded-lg overflow-hidden">
+      <canvas id="sineCanvas" class="w-full h-full block touch-none"></canvas>
+
+      <!-- Compact Inline Legend & Hover Readout -->
+      <div class="absolute top-1.5 left-2 right-2 flex items-center justify-between pointer-events-none text-[10px] text-slate-400">
+        <div class="flex items-center gap-2.5 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800/80">
+          <span class="flex items-center gap-1">
+            <span class="inline-block w-2.5 h-0.5 bg-sky-400 rounded"></span>
+            <span class="text-slate-200 font-medium">A·sin(Bx+C)+D</span>
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="inline-block w-2.5 border-b border-dashed border-slate-400"></span>
+            <span>sin(x)</span>
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="inline-block w-2.5 border-b border-dotted border-amber-400"></span>
+            <span>osa y=D</span>
+          </span>
+        </div>
+        <div id="hoverCoords" class="hidden sm:block bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800/80 mono text-[10px] text-slate-300">
+          Přejeď myší / prstem po grafu
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. COMPACT INFO STRIP: 3 Key Properties in 1 Row -->
+    <div class="grid grid-cols-3 gap-1.5 text-center">
+      <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg px-1.5 py-1 flex flex-col justify-center">
+        <span class="text-[10px] text-slate-400 leading-tight">Perioda <span class="mono text-emerald-400">T = 2π/|B|</span></span>
+        <span id="valPeriod" class="mono text-xs sm:text-sm font-bold text-slate-100 leading-snug">2π</span>
+      </div>
+      <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg px-1.5 py-1 flex flex-col justify-center">
+        <span class="text-[10px] text-slate-400 leading-tight">Posun počátku <span class="mono text-purple-400">x₀ = -C/B</span></span>
+        <span id="valPhaseShift" class="mono text-xs sm:text-sm font-bold text-slate-100 leading-snug">0</span>
+      </div>
+      <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg px-1.5 py-1 flex flex-col justify-center">
+        <span class="text-[10px] text-slate-400 leading-tight">Obor hodnot <span class="mono text-amber-400">H(f)</span></span>
+        <span id="valRange" class="mono text-xs sm:text-sm font-bold text-slate-100 leading-snug">⟨-1; 3⟩</span>
+      </div>
+    </div>
+
+    <!-- 4. COMPACT 2x2 SLIDER CONTROLS -->
+    <div class="grid grid-cols-2 gap-1.5">
+      <!-- Slider A: Amplituda -->
+      <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-medium text-slate-300"><strong class="text-sky-400 mono">A</strong> Amplituda (výška)</span>
+          <span id="lblA" class="mono font-bold text-sky-400 text-xs">2</span>
+        </div>
+        <input id="sliderA" type="range" min="-10" max="10" step="0.5" value="2" class="text-sky-400" />
+      </div>
+
+      <!-- Slider B: Frekvence -->
+      <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-medium text-slate-300"><strong class="text-emerald-400 mono">B</strong> Hustota vln (perioda)</span>
+          <span id="lblB" class="mono font-bold text-emerald-400 text-xs">1</span>
+        </div>
+        <input id="sliderB" type="range" min="0.5" max="6" step="0.5" value="1" class="text-emerald-400" />
+      </div>
+
+      <!-- Slider C: Fázový posun (in steps of pi/6 from -pi to +pi) -->
+      <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-medium text-slate-300"><strong class="text-purple-400 mono">C</strong> Fáze (posun X)</span>
+          <span id="lblC" class="mono font-bold text-purple-400 text-xs">0</span>
+        </div>
+        <!-- Stored as integer sixths of pi (-6 to +6) so π fractions are 100% exact -->
+        <input id="sliderC" type="range" min="-6" max="6" step="1" value="0" class="text-purple-400" />
+      </div>
+
+      <!-- Slider D: Svislý posun -->
+      <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-medium text-slate-300"><strong class="text-amber-400 mono">D</strong> Svislý posun (osa Y)</span>
+          <span id="lblD" class="mono font-bold text-amber-400 text-xs">+1</span>
+        </div>
+        <input id="sliderD" type="range" min="-5" max="5" step="0.5" value="1" class="text-amber-400" />
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- DOM Elements ---
+    const canvas = document.getElementById('sineCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const sliderA = document.getElementById('sliderA');
+    const sliderB = document.getElementById('sliderB');
+    const sliderC = document.getElementById('sliderC'); // -6..6 in multiples of π/6
+    const sliderD = document.getElementById('sliderD');
+
+    const lblA = document.getElementById('lblA');
+    const lblB = document.getElementById('lblB');
+    const lblC = document.getElementById('lblC');
+    const lblD = document.getElementById('lblD');
+
+    const eqText = document.getElementById('eqText');
+    const valPeriod = document.getElementById('valPeriod');
+    const valPhaseShift = document.getElementById('valPhaseShift');
+    const valRange = document.getElementById('valRange');
+    const hoverCoords = document.getElementById('hoverCoords');
+
+    const btnNotebook = document.getElementById('btnNotebook');
+    const btnReset = document.getElementById('btnReset');
+
+    // --- State ---
+    const state = {
+      A: 2,
+      B: 1,
+      cSixths: 0, // C = cSixths * (π / 6)
+      D: 1,
+      hoverX: null
+    };
+
+    // Greatest Common Divisor for clean fraction formatting
+    function gcd(a, b) {
+      a = Math.abs(Math.round(a));
+      b = Math.abs(Math.round(b));
+      while (b) {
+        const t = b;
+        b = a % b;
+        a = t;
+      }
+      return a || 1;
+    }
+
+    // Formats a rational multiple of π: (num / den) * π
+    function formatPiFraction(num, den, includePlus = false) {
+      if (Math.abs(num) < 1e-9) return '0';
+      const sign = num < 0 ? '-' : (includePlus ? '+' : '');
+      const absNum = Math.abs(Math.round(num));
+      const absDen = Math.abs(Math.round(den));
+      const d = gcd(absNum, absDen);
+      const n = absNum / d;
+      const m = absDen / d;
+
+      const piPart = n === 1 ? 'π' : `${n}π`;
+      return m === 1 ? `${sign}${piPart}` : `${sign}${piPart}/${m}`;
+    }
+
+    // Formats Czech numbers (comma as decimal separator)
+    function fmtNum(n, plusSign = false) {
+      const rounded = Math.round(n * 100) / 100;
+      const str = rounded.toString().replace('.', ',');
+      if (plusSign && rounded > 0) return '+' + str;
+      return str;
+    }
+
+    // Build readable equation HTML
+    function updateFormulaAndStats() {
+      const { A, B, cSixths, D } = state;
+
+      // Update slider value labels
+      lblA.textContent = fmtNum(A);
+      lblB.textContent = fmtNum(B);
+      lblC.textContent = formatPiFraction(cSixths, 6, true);
+      lblD.textContent = fmtNum(D, true);
+
+      // Build dynamic formula string: y = A sin(Bx + C) + D
+      const aPart = `<span class="text-sky-400">${fmtNum(A)}</span>`;
+      const bPart = B === 1 ? 'x' : `<span class="text-emerald-400">${fmtNum(B)}</span>x`;
+      let cPart = '';
+      if (cSixths !== 0) {
+        const sign = cSixths > 0 ? ' + ' : ' - ';
+        const frac = formatPiFraction(Math.abs(cSixths), 6, false);
+        cPart = `${sign}<span class="text-purple-400">${frac}</span>`;
+      }
+      let dPart = '';
+      if (D !== 0) {
+        const sign = D > 0 ? ' + ' : ' - ';
+        dPart = `${sign}<span class="text-amber-400">${fmtNum(Math.abs(D))}</span>`;
+      }
+
+      eqText.innerHTML = `${aPart}·sin(${bPart}${cPart})${dPart}`;
+
+      // 1. Perioda T = 2π / |B|
+      // Since B is in steps of 0.5, 2*B is an integer: T = (4 / (2*B)) * π
+      const twoB = Math.round(Math.abs(B) * 2);
+      valPeriod.textContent = formatPiFraction(4, twoB, false);
+
+      // 2. Skutečný fázový posun x0 = -C / B = -(cSixths * π / 6) / B = (-2 * cSixths) / (6 * 2B) * π
+      if (cSixths === 0) {
+        valPhaseShift.textContent = '0';
+      } else {
+        const num = -2 * cSixths;
+        const den = 6 * twoB;
+        const dir = num > 0 ? ' (vpravo)' : ' (vlevo)';
+        valPhaseShift.textContent = formatPiFraction(num, den, true) + dir;
+      }
+
+      // 3. Obor hodnot H(f) = <D - |A|; D + |A|>
+      const minVal = D - Math.abs(A);
+      const maxVal = D + Math.abs(A);
+      valRange.textContent = `⟨${fmtNum(minVal)}; ${fmtNum(maxVal)}⟩`;
+    }
+
+    // Compute dynamic Y-axis bounds based on |A| and |D|
+    function getYBounds() {
+      const minWave = state.D - Math.abs(state.A);
+      const maxWave = state.D + Math.abs(state.A);
+
+      // Default comfortable range is [-4, 4], expands smoothly for larger A and D
+      const yMin = Math.min(-4, Math.floor(minWave - 1.5));
+      const yMax = Math.max(4, Math.ceil(maxWave + 1.5));
+      return { yMin, yMax };
+    }
+
+    // Draw the graph onto the canvas
+    function drawGraph() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const W = rect.width;
+      const H = rect.height;
+
+      // Padding inside canvas so labels fit cleanly
+      const padLeft = 32;
+      const padRight = 14;
+      const padTop = 26;
+      const padBottom = 22;
+
+      const plotW = W - padLeft - padRight;
+      const plotH = H - padTop - padBottom;
+
+      const xMin = -2 * Math.PI;
+      const xMax = 2 * Math.PI;
+      const { yMin, yMax } = getYBounds();
+
+      const toPxX = (x) => padLeft + ((x - xMin) / (xMax - xMin)) * plotW;
+      const toPxY = (y) => padTop + ((yMax - y) / (yMax - yMin)) * plotH;
+      const toMathX = (px) => xMin + ((px - padLeft) / plotW) * (xMax - xMin);
+
+      // Clear background
+      ctx.clearRect(0, 0, W, H);
+
+      // Subtle shaded band for Range H(f) = [D - |A|, D + |A|]
+      const yTopBand = toPxY(state.D + Math.abs(state.A));
+      const yBotBand = toPxY(state.D - Math.abs(state.A));
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.05)';
+      ctx.fillRect(padLeft, yTopBand, plotW, Math.max(1, yBotBand - yTopBand));
+
+      // --- Horizontal Y Gridlines & Labels ---
+      const ySpan = yMax - yMin;
+      const yStep = ySpan <= 10 ? 2 : (ySpan <= 18 ? 4 : 5);
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let y = Math.ceil(yMin / yStep) * yStep; y <= yMax; y += yStep) {
+        const py = toPxY(y);
+        ctx.beginPath();
+        ctx.strokeStyle = y === 0 ? '#475569' : '#1e293b';
+        ctx.lineWidth = y === 0 ? 1.3 : 1;
+        ctx.moveTo(padLeft, py);
+        ctx.lineTo(W - padRight, py);
+        ctx.stroke();
+
+        ctx.fillStyle = y === 0 ? '#cbd5e1' : '#64748b';
+        ctx.fillText(y.toString(), padLeft - 5, py);
+      }
+
+      // --- Vertical X Gridlines & Radian Labels (-2π to 2π in steps of π/2) ---
+      const xTicks = [
+        { val: -2 * Math.PI, lbl: '-2π' },
+        { val: -1.5 * Math.PI, lbl: '-3π/2' },
+        { val: -Math.PI, lbl: '-π' },
+        { val: -0.5 * Math.PI, lbl: '-π/2' },
+        { val: 0, lbl: '0' },
+        { val: 0.5 * Math.PI, lbl: 'π/2' },
+        { val: Math.PI, lbl: 'π' },
+        { val: 1.5 * Math.PI, lbl: '3π/2' },
+        { val: 2 * Math.PI, lbl: '2π' }
+      ];
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      xTicks.forEach((t) => {
+        const px = toPxX(t.val);
+        ctx.beginPath();
+        ctx.strokeStyle = Math.abs(t.val) < 1e-6 ? '#475569' : '#1e293b';
+        ctx.lineWidth = Math.abs(t.val) < 1e-6 ? 1.3 : 1;
+        ctx.moveTo(px, padTop);
+        ctx.lineTo(px, H - padBottom);
+        ctx.stroke();
+
+        ctx.fillStyle = Math.abs(t.val) < 1e-6 ? '#cbd5e1' : '#64748b';
+        ctx.fillText(t.lbl, px, H - padBottom + 5);
+      });
+
+      // --- Dotted Horizontal Line for Center Axis y = D ---
+      const pyD = toPxY(state.D);
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.2;
+      ctx.moveTo(padLeft, pyD);
+      ctx.lineTo(W - padRight, pyD);
+      ctx.stroke();
+      ctx.restore();
+
+      // --- Dashed Reference Curve: y = sin(x) ---
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1.4;
+      const samples = 280;
+      for (let i = 0; i <= samples; i++) {
+        const x = xMin + (i / samples) * (xMax - xMin);
+        const y = Math.sin(x);
+        const px = toPxX(x);
+        const py = toPxY(y);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // --- Main Transformed Curve: y = A sin(Bx + C) + D ---
+      const C = (state.cSixths * Math.PI) / 6;
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.4;
+      const mainSamples = 450;
+      for (let i = 0; i <= mainSamples; i++) {
+        const x = xMin + (i / mainSamples) * (xMax - xMin);
+        const y = state.A * Math.sin(state.B * x + C) + state.D;
+        const px = toPxX(x);
+        const py = toPxY(y);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // --- Highlight Shifted Wave Start Point: x0 = -C/B, y = D ---
+      const x0 = -C / state.B;
+      if (x0 >= xMin && x0 <= xMax) {
+        const px0 = toPxX(x0);
+        const py0 = toPxY(state.D);
+        ctx.beginPath();
+        ctx.arc(px0, py0, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#c084fc';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#0f172a';
+        ctx.stroke();
+      }
+
+      // --- Interactive Hover / Touch Crosshair ---
+      if (state.hoverX !== null && state.hoverX >= padLeft && state.hoverX <= W - padRight) {
+        const mathX = toMathX(state.hoverX);
+        const mathY = state.A * Math.sin(state.B * mathX + C) + state.D;
+        const py = toPxY(mathY);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.moveTo(state.hoverX, padTop);
+        ctx.lineTo(state.hoverX, H - padBottom);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(state.hoverX, py, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+
+        const xPi = (mathX / Math.PI).toFixed(2).replace('.', ',') + 'π';
+        hoverCoords.textContent = `x ≈ ${xPi} | y = ${fmtNum(mathY)}`;
+        hoverCoords.classList.remove('hidden');
+      }
+    }
+
+    function syncAndRender() {
+      state.A = parseFloat(sliderA.value);
+      state.B = parseFloat(sliderB.value);
+      state.cSixths = parseInt(sliderC.value, 10);
+      state.D = parseFloat(sliderD.value);
+      updateFormulaAndStats();
+      drawGraph();
+    }
+
+    // --- Event Listeners ---
+    [sliderA, sliderB, sliderC, sliderD].forEach((el) => {
+      el.addEventListener('input', syncAndRender);
+    });
+
+    // Preset 1: Notebook example y = 10 sin(3x + π) + 3
+    btnNotebook.addEventListener('click', () => {
+      sliderA.value = 10;
+      sliderB.value = 3;
+      sliderC.value = 6; // 6 * (π/6) = +π
+      sliderD.value = 3;
+      syncAndRender();
+    });
+
+    // Preset 2: Base y = sin(x)
+    btnReset.addEventListener('click', () => {
+      sliderA.value = 1;
+      sliderB.value = 1;
+      sliderC.value = 0;
+      sliderD.value = 0;
+      syncAndRender();
+    });
+
+    // Pointer / Touch Hover on Canvas
+    function handlePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      state.hoverX = clientX - rect.left;
+      drawGraph();
+    }
+
+    canvas.addEventListener('mousemove', handlePointer);
+    canvas.addEventListener('touchstart', handlePointer, { passive: true });
+    canvas.addEventListener('touchmove', handlePointer, { passive: true });
+    canvas.addEventListener('mouseleave', () => {
+      state.hoverX = null;
+      drawGraph();
+    });
+
+    window.addEventListener('resize', drawGraph);
+    window.onload = syncAndRender;
+  </script>
 </body>
 </html>
